@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt-nodejs');
 const cors = require('cors');
 const knex = require('knex');
+const morgan = require('morgan');
 
 const register = require('./controllers/register');
 const signin = require('./controllers/signin');
@@ -11,18 +12,14 @@ const image = require('./controllers/image');
 
 const db = knex({
   client: 'pg',
-  connection: {
-    host: '127.0.0.1',
-    user: 'Efflux',
-    password: '',
-    database: 'smart-brain'
-  }
+  connection: process.env.POSTGRES_URI
 });
 
 const app = express();
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use(morgan('combined'));
 
 app.get('/', (req, res) => (res.redirect('http://localhost:3001')));
 app.post('/signin', signin.handleSignin(db, bcrypt));
