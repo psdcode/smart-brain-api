@@ -1,48 +1,42 @@
-const handleSignin = (db, bcrypt) => (req, res) => {
+const { getAuthTokenId, createSession } = require('./token');
+
+const handleSignin = (db, bcrypt, req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
-    return res.status(400).json('incorrect form submission');
+    return Promise.reject(Error('Incomplete form submission'));
   }
-  db.select('email', 'hash').from('login')
+  return db.select('email', 'hash').from('login')
     .where({ email })
     .then(data => {
       const isValid = bcrypt.compareSync(password, data[0].hash);
       if (isValid) {
         return db('users')
           .where({ email })
-          .then(user => {
-            res.json(user[0]);
-          })
-          .catch(() => res.status(400).json('unable to get user'));
+          .then(user => user[0]) // on success, user[0] object is returned by handleSignin
+          .catch(() => Promise.reject(Error('Unable to get user')));
       } else {
-        res.status(400).json('wrong credentials');
+        return Promise.reject(Error('Wrong Credentials'));
       }
     })
-    .catch(() => res.status(400).json('wrong credentials'));
+    .catch(() => Promise.reject(Error('Wrong Credentials')));
 };
 
-// const handleSignin = (db, bcrypt) => async (req, res) => {
-//   const { email, password } = req.body;
-//   if (!email || !password) {
-//     console.log('Incorrect Form Submission');
-//     return res.status(400).json('Incorrect Form Submission');
-//   }
-//   const data = await db('login').select('email', 'hash').where({ email });
-//   const isValid = bcrypt.compareSync(password, data[0].hash);
-//   if (isValid) {
-//     const user = await db('users').where({ email });
-//     if (user[0]) {
-//       console.log('signed in');
-//       return res.json(user[0]);
-//     }
-//     console.log('Good pass but Error ');
-//     return res.status(400).json('Unable to Retrieve User');
-//   } else {
-//     console.log('Bad Pass');
-//     return res.status(400).json('Bad Pass');
-//   }
-// };
+const handleAuthentication = (db, bcrypt, redisClient) => (req, res) => {
+  // First check authorization headers
+  const { authorization } = req.headers;
+  return authorization
+    ? getAuthTokenId(authorization, redisClient, res)
+    : handleSignin(db, bcrypt, req, res)
+      .then((userData) => (
+        userData.id && userData.email
+          ? createSession(userData, redisClient)
+          : Promise.reject(Error('Incomplete User Data'))
+      ))
+      .then((session) => (res.json(session)))
+      .catch((err) => (res.status(401).json(err)));
+};
 
 module.exports = {
-  handleSignin
+  handleSignin,
+  handleAuthentication
 };

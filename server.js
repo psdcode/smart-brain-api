@@ -5,10 +5,15 @@ const cors = require('cors');
 const knex = require('knex');
 const morgan = require('morgan');
 
-const register = require('./controllers/register');
-const signin = require('./controllers/signin');
-const profile = require('./controllers/profile');
-const image = require('./controllers/image');
+// Redis
+const redis = require('redis');
+const redisClient = redis.createClient(process.env.REDIS_URI);
+
+const { handleRegister } = require('./controllers/register');
+const { handleAuthentication } = require('./controllers/signin');
+const { handleProfileGet, handleProfileUpdate } = require('./controllers/profile');
+const { handleImage, handleApiCall } = require('./controllers/image');
+const { requireAuth } = require('./controllers/authorization');
 
 const db = knex({
   client: 'pg',
@@ -22,11 +27,12 @@ app.use(bodyParser.json());
 app.use(morgan('combined'));
 
 app.get('/', (req, res) => (res.redirect('http://localhost:3001')));
-app.post('/signin', signin.handleSignin(db, bcrypt));
-app.post('/register', register.handleRegister(db, bcrypt));
-app.get('/profile/:id', profile.handleProfileGet(db));
-app.put('/image', image.handleImage(db));
-app.post('/imageurl', image.handleApiCall());
+app.post('/signin', handleAuthentication(db, bcrypt, redisClient));
+app.post('/register', handleRegister(db, bcrypt, redisClient));
+app.get('/profile/:id', requireAuth(redisClient), handleProfileGet(db));
+app.post('/profile/:id', requireAuth(redisClient), handleProfileUpdate(db));
+app.put('/image', requireAuth(redisClient), handleImage(db));
+app.post('/imageurl', requireAuth(redisClient), handleApiCall());
 
 app.listen(3000, () => {
   console.log('app is running on port 3000');

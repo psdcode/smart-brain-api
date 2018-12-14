@@ -3,12 +3,16 @@ BEGIN TRANSACTION;
 INSERT INTO users (
   name,
   email,
+  age,
+  pet,
   entries,
   joined
 )
 values (
   'Bofman',
   'bof@bof.com',
+  55,
+  'Dragon',
   5,
   '2018-10-05'
 );
